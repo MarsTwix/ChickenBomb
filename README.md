@@ -1,2 +1,15 @@
-# ChickenBomb
-Fog Box is a plugin/item for csgo within the TTT gamemode. This item is a chicken that is explosive, if you shoot it, it will create a small explosion, but if you wait to long there will be a greater explosion.
+<h1 align="center">
+    Trouble in Terrorist Town: ChickenBomb
+</h1>
+<p align="center">
+    <strong>ChickenBomb is a plugin/item for csgo within the TTT gamemode.</strong>
+</p>
+
+## Status
+*Be aware this plugin is still in development, so expect some changes and issues.*
+
+## ToDo list
+ - Convert into ttt item
+
+## Download
+ - https://github.com/MarsTwix/ChickenBomb
