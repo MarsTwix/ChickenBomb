@@ -250,3 +250,14 @@ void ClearTimers(int client)
     ClearTimer(g_iPlayer[client].timeleft);
 }
 
+//A native so you can use this plugin in other plugin
+public int Native_CreateChicken(Handle plugin, int numParams)
+{
+    int client = GetNativeCell(1);
+    if (!TTT_IsClientValid(client))
+    {
+        PrintToServer("Invalid client (%d)", client);
+        return;
+    }
+    CreateChicken(client);
+}
