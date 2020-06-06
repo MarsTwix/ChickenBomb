@@ -9,7 +9,7 @@
 *Be aware this plugin is still in development, so expect some changes and issues.*
 
 ## ToDo list
- - Convert into ttt item
+ - ~~Convert into ttt item~~
  - Give explanations
  
 ## Download
