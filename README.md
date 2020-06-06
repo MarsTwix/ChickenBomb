@@ -10,6 +10,7 @@
 
 ## ToDo list
  - Convert into ttt item
-
+ - Give explanations
+ 
 ## Download
  - https://github.com/MarsTwix/ChickenBomb

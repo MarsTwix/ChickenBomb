@@ -22,11 +22,19 @@ enum struct PlayerData
 
     int ClientChickenBomb;
 
-    //float ColorTime = 2.0
     float time;
 }
 
 ConVar g_cExplodeTime = null;
+
+ConVar g_cNormalChickenTime = null;
+ConVar g_cRedChickenTime = null;
+
+ConVar g_cGrenadeDamage = null;
+ConVar g_cGrenadeRadius = null;
+
+ConVar g_cExplosionRadius = null;
+ConVar g_cExplosionMagnitude = null;
 
 PlayerData g_iPlayer[MAXPLAYERS + 1];
 
@@ -42,23 +50,48 @@ public Plugin myinfo =
 public OnPluginStart()
 {
     g_cExplodeTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explode_time", "5.0", "The amount of time until the chicken bomb will explode.");
+    g_cNormalChickenTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_normal_time", "0.5", "The amount of time that the chicken will be its normal color.");
+    g_cRedChickenTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_red_time", "0.5", "The amount of time that the chicken will be the red color.");
+    g_cGrenadeDamage = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_damage", "500", "The damage of the grenade the chicken will drop after being shot.");
+    g_cGrenadeRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_radius", "500", "The radius of the grenade the chicken will drop after being shot.");
+    g_cExplosionRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_radius", "850", "The radius of the chicken that will explode.");
+    g_cExplosionMagnitude = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_magnitude", "850", "The magnitude of the chicken that will explode.");
     RegConsoleCmd("sm_spawnchicken", Command_SpawnChicken, "Spawns a chicken");
 }
 
-public OnMapStart()
+public void OnMapStart()
 {
     PrecacheSoundAny(SND_BOMB);
     PrecacheSoundAny(SND_BEEP);
 
-    ResetAll();
+    LoopValidClients(i)
+    {
+        ClientReset(i);
+    }
+}
+
+public void OnClientPutInServer(int client)
+{
+    g_iPlayer[client].chickenexplode = INVALID_HANDLE;
+    g_iPlayer[client].normalchicken = INVALID_HANDLE;
+    g_iPlayer[client].redchicken = INVALID_HANDLE;
+    g_iPlayer[client].timeleft = INVALID_HANDLE;
 }
 
 public Action CS_OnTerminateRound()
 {
-    ResetAll();
+    LoopValidClients(i)
+    {
+        ClientReset(i);
+    }
 }
 
 Action Command_SpawnChicken(client, args)
+{
+    CreateChicken(client);
+}
+
+public void CreateChicken(int client)
 {
     if (!g_iPlayer[client].HasChickenBomb)
     {
@@ -68,10 +101,16 @@ Action Command_SpawnChicken(client, args)
         {
             DataPack data;
 
+            char sGrenadeDamage[8];
+            char sGrenadeRadius[8];
+
+            IntToString(g_cGrenadeDamage.IntValue, sGrenadeDamage, sizeof(sGrenadeDamage));
+            IntToString(g_cGrenadeRadius.IntValue, sGrenadeRadius, sizeof(sGrenadeRadius));
+
             GetClientAbsOrigin(client, origin);
             DispatchKeyValue(entity, "targetname", "chickenbomb");
-            DispatchKeyValue(entity, "ExplodeDamage", "500");
-            DispatchKeyValue(entity, "ExplodeRadius", "500");
+            DispatchKeyValue(entity, "ExplodeDamage", sGrenadeDamage);
+            DispatchKeyValue(entity, "ExplodeRadius", sGrenadeRadius);
             DispatchSpawn(entity);
             SetEntProp(entity, Prop_Data, "m_takedamage", 2);
 
@@ -93,9 +132,9 @@ Action Command_SpawnChicken(client, args)
             EmitAmbientSoundAny("weapons/c4/c4_beep1.wav", NULL_VECTOR, entity);
             DispatchKeyValue(entity, "rendercolor", "255, 255, 255");
 
-            g_iPlayer[client].normalchicken = CreateTimer(0.5, Timer_NormalChicken, entity, TIMER_REPEAT);
+            g_iPlayer[client].normalchicken = CreateTimer(g_cNormalChickenTime.FloatValue, Timer_NormalChicken, entity, TIMER_REPEAT);
 
-            g_iPlayer[client].redchicken = CreateTimer(1.0, Timer_RedChicken, entity, TIMER_REPEAT);
+            g_iPlayer[client].redchicken = CreateTimer(g_cNormalChickenTime.FloatValue + g_cRedChickenTime.FloatValue, Timer_RedChicken, entity, TIMER_REPEAT);
 
             g_iPlayer[client].timeleft = CreateTimer(1.0, Timer_TimeLeft, client, TIMER_REPEAT);
         }
@@ -134,8 +173,8 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
         DispatchKeyValue(shakeIndex, "radius", sShakeRadius);
         DispatchKeyValue(particleIndex, "effect_name", "explosion_c4_500");
         SetEntProp(explosionIndex, Prop_Data, "m_spawnflags", 16384);
-        SetEntProp(explosionIndex, Prop_Data, "m_iRadiusOverride", 850);
-        SetEntProp(explosionIndex, Prop_Data, "m_iMagnitude", 850);
+        SetEntProp(explosionIndex, Prop_Data, "m_iRadiusOverride", g_cExplosionRadius.IntValue);
+        SetEntProp(explosionIndex, Prop_Data, "m_iMagnitude", g_cExplosionMagnitude.IntValue);
         DispatchKeyValue(explosionIndex, "targetname", "c4");
         DispatchSpawn(particleIndex);
         DispatchSpawn(explosionIndex);
@@ -154,7 +193,7 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
 
         EmitAmbientSoundAny(SND_BOMB, position);
         ClearTimers(client);
-        reset(client);
+        ClientReset(client);
     }
 }
 
@@ -175,7 +214,7 @@ public void OnEntityDestroyed(entity)
             {
                 PrintToChatAll("The chicken got shot and created a small explosion!");
                 ClearTimers(i);
-                reset(i);
+                ClientReset(i);
             }
         }
     }
@@ -195,23 +234,12 @@ Action Timer_RedChicken(Handle timer, entity)
     EmitAmbientSoundAny(SND_BEEP, position);
 }
 
-void reset(int client)
+void ClientReset(int client)
 {
     g_iPlayer[client].HasChickenBomb = false;
     g_iPlayer[client].ClientChickenBomb = 0;
     g_iPlayer[client].time = g_cExplodeTime.FloatValue;
     g_iPlayer[client].HasChickenBomb = false;
-}
-
-void ResetAll()
-{
-    LoopClients(i)
-    {
-        g_iPlayer[i].HasChickenBomb = false;
-        g_iPlayer[i].ClientChickenBomb = 0;
-        g_iPlayer[i].time = g_cExplodeTime.FloatValue;
-        g_iPlayer[i].HasChickenBomb = false;
-    }
 }
 
 void ClearTimers(int client)
@@ -221,3 +249,4 @@ void ClearTimers(int client)
     ClearTimer(g_iPlayer[client].redchicken);
     ClearTimer(g_iPlayer[client].timeleft);
 }
+
