@@ -78,14 +78,6 @@ public void OnClientPutInServer(int client)
     g_iPlayer[client].timeleft = INVALID_HANDLE;
 }
 
-public Action CS_OnTerminateRound()
-{
-    LoopValidClients(i)
-    {
-        ClientReset(i);
-    }
-}
-
 Action Command_SpawnChicken(client, args)
 {
     CreateChicken(client);
@@ -120,6 +112,9 @@ public void CreateChicken(int client)
 
             g_iPlayer[client].HasChickenBomb = true;
             g_iPlayer[client].ChickenGotShot = true;
+
+            int leader = ClosestClient(entity);
+            SetEntPropEnt(entity, Prop_Send, "m_leader", leader);
 
             g_iPlayer[client].chickenexplode = CreateDataTimer(g_iPlayer[client].time, Timer_ChickenExplode, data);
             data.WriteCell(entity);
@@ -248,6 +243,29 @@ void ClearTimers(int client)
     ClearTimer(g_iPlayer[client].normalchicken);
     ClearTimer(g_iPlayer[client].redchicken);
     ClearTimer(g_iPlayer[client].timeleft);
+}
+
+int ClosestClient(int entity)
+{
+    int leader;
+    float LeaderDistance = 0.0;
+    float EntityPosition[3];
+    float ClientPosition[3];
+    float distance;
+            
+    LoopValidClients(i)
+    {
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", EntityPosition);
+        GetClientAbsOrigin(i, ClientPosition);
+        distance = GetVectorDistance(EntityPosition, ClientPosition);
+        if (distance > LeaderDistance)
+        {
+            LeaderDistance = distance;
+            leader = i;
+        }
+    }
+
+    return leader;
 }
 
 //A native so you can use this plugin in other plugin
