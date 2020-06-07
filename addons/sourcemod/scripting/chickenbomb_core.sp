@@ -17,7 +17,7 @@ enum struct PlayerData
     Handle redchicken;
     Handle timeleft;
 
-    bool ChickenGotShot;
+    bool ChickenExploded;
     bool HasChickenBomb;
 
     int ClientChickenBomb;
@@ -35,6 +35,8 @@ ConVar g_cGrenadeRadius = null;
 
 ConVar g_cExplosionRadius = null;
 ConVar g_cExplosionMagnitude = null;
+ConVar g_cExplosionDeathRadius = null;
+ConVar g_cDeathRadiusEnabled = null;
 
 PlayerData g_iPlayer[MAXPLAYERS + 1];
 
@@ -54,8 +56,14 @@ public OnPluginStart()
     g_cRedChickenTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_red_time", "0.5", "The amount of time that the chicken will be the red color.");
     g_cGrenadeDamage = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_damage", "500", "The damage of the grenade the chicken will drop after being shot.");
     g_cGrenadeRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_radius", "500", "The radius of the grenade the chicken will drop after being shot.");
-    g_cExplosionRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_radius", "850", "The radius of the chicken that will explode.");
-    g_cExplosionMagnitude = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_magnitude", "850", "The magnitude of the chicken that will explode.");
+    g_cExplosionRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_radius", "1000", "The radius of the chicken that will explode.");
+    g_cExplosionMagnitude = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_magnitude", "1000", "The magnitude of the chicken that will explode.");
+    g_cExplosionDeathRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_death_radius", "500.0", "The radius of the certain death of a player, so if the player is in radius he will certainly die.");
+    g_cDeathRadiusEnabled = AutoExecConfig_CreateConVar("ttt_chicken_bomb_death_radius_enabled", "1", "Sets whether the death radius is enabled.");
+
+    HookEvent("weapon_fire", Event_WeaponFire);
+    HookEvent("hegrenade_detonate", Event_HegrenadeDetonate);
+
     RegConsoleCmd("sm_spawnchicken", Command_SpawnChicken, "Spawns a chicken");
 }
 
@@ -63,7 +71,10 @@ public void OnMapStart()
 {
     PrecacheSoundAny(SND_BOMB);
     PrecacheSoundAny(SND_BEEP);
+}
 
+public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
     LoopValidClients(i)
     {
         ClientReset(i);
@@ -88,7 +99,6 @@ public void CreateChicken(int client)
     if (!g_iPlayer[client].HasChickenBomb)
     {
         int entity = CreateEntityByName("chicken");
-        float origin[3];
         if (IsValidEntity(entity))
         {
             DataPack data;
@@ -99,7 +109,14 @@ public void CreateChicken(int client)
             IntToString(g_cGrenadeDamage.IntValue, sGrenadeDamage, sizeof(sGrenadeDamage));
             IntToString(g_cGrenadeRadius.IntValue, sGrenadeRadius, sizeof(sGrenadeRadius));
 
-            GetClientAbsOrigin(client, origin);
+            float vPos[3];
+            float ang[3];
+            GetClientAbsOrigin(client, vPos);
+            GetClientAbsAngles(client, ang);
+            vPos[0] = (vPos[0]+(16*(Cosine(DegToRad(ang[1])))));
+
+            int RandomNum = GetRandomInt(0, 5);
+            SetEntProp(entity, Prop_Send, "m_nBody", RandomNum);
             DispatchKeyValue(entity, "targetname", "chickenbomb");
             DispatchKeyValue(entity, "ExplodeDamage", sGrenadeDamage);
             DispatchKeyValue(entity, "ExplodeRadius", sGrenadeRadius);
@@ -107,15 +124,15 @@ public void CreateChicken(int client)
             SetEntProp(entity, Prop_Data, "m_takedamage", 2);
 
             g_iPlayer[client].ClientChickenBomb = entity;
-            origin[0] += 20.0;
-            TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
+            TeleportEntity(entity, vPos, NULL_VECTOR, NULL_VECTOR);
 
             g_iPlayer[client].HasChickenBomb = true;
-            g_iPlayer[client].ChickenGotShot = true;
+            g_iPlayer[client].ChickenExploded = false;
 
             int leader = ClosestClient(entity);
             SetEntPropEnt(entity, Prop_Send, "m_leader", leader);
 
+            g_iPlayer[client].time = g_cExplodeTime.FloatValue;
             g_iPlayer[client].chickenexplode = CreateDataTimer(g_iPlayer[client].time, Timer_ChickenExplode, data);
             data.WriteCell(entity);
             data.WriteCell(client);
@@ -148,14 +165,14 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
 
     GetEntPropVector(entity, Prop_Send, "m_vecOrigin", position);
 
-    g_iPlayer[client].ChickenGotShot = false;
-
+    g_iPlayer[client].ChickenExploded = true;
+    SetEntPropEnt(entity, Prop_Send, "m_leader", -1);
     AcceptEntityInput(entity, "Kill");
 
-    int explosionIndex = CreateEntityByName("env_explosion");
+    int ExplosionIndex = CreateEntityByName("env_explosion");
     int particleIndex = CreateEntityByName("info_particle_system");
     int shakeIndex = CreateEntityByName("env_shake");
-    if (explosionIndex != -1 && particleIndex != -1 && shakeIndex != -1)
+    if (ExplosionIndex != -1 && particleIndex != -1 && shakeIndex != -1)
     {
         PrintToChatAll("BOOM!");
         
@@ -167,28 +184,48 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
         DispatchKeyValue(shakeIndex, "frequency", "2.5");
         DispatchKeyValue(shakeIndex, "radius", sShakeRadius);
         DispatchKeyValue(particleIndex, "effect_name", "explosion_c4_500");
-        SetEntProp(explosionIndex, Prop_Data, "m_spawnflags", 16384);
-        SetEntProp(explosionIndex, Prop_Data, "m_iRadiusOverride", g_cExplosionRadius.IntValue);
-        SetEntProp(explosionIndex, Prop_Data, "m_iMagnitude", g_cExplosionMagnitude.IntValue);
-        DispatchKeyValue(explosionIndex, "targetname", "c4");
+        SetEntProp(ExplosionIndex, Prop_Data, "m_spawnflags", 16384);
+        SetEntProp(ExplosionIndex, Prop_Data, "m_iRadiusOverride", g_cExplosionRadius.IntValue);
+        SetEntProp(ExplosionIndex, Prop_Data, "m_iMagnitude", g_cExplosionMagnitude.IntValue);
+        DispatchKeyValue(ExplosionIndex, "targetname", "c4");
         DispatchSpawn(particleIndex);
-        DispatchSpawn(explosionIndex);
+        DispatchSpawn(ExplosionIndex);
         DispatchSpawn(shakeIndex);
         ActivateEntity(shakeIndex);
         ActivateEntity(particleIndex);
-        ActivateEntity(explosionIndex);
+        ActivateEntity(ExplosionIndex);
         TeleportEntity(particleIndex, position, NULL_VECTOR, NULL_VECTOR);
-        TeleportEntity(explosionIndex, position, NULL_VECTOR, NULL_VECTOR);
+        TeleportEntity(ExplosionIndex, position, NULL_VECTOR, NULL_VECTOR);
         TeleportEntity(shakeIndex, position, NULL_VECTOR, NULL_VECTOR);
+        SetEntPropEnt(ExplosionIndex, Prop_Send, "m_hOwnerEntity", client);
         AcceptEntityInput(entity, "Kill");
-        AcceptEntityInput(explosionIndex, "Explode");
+        AcceptEntityInput(ExplosionIndex, "Explode");
         AcceptEntityInput(particleIndex, "Start");
         AcceptEntityInput(shakeIndex, "StartShake");
-        AcceptEntityInput(explosionIndex, "Kill");
+        AcceptEntityInput(ExplosionIndex, "Kill");
 
         EmitAmbientSoundAny(SND_BOMB, position);
+
+        
         ClearTimers(client);
         ClientReset(client);
+
+        if (g_cDeathRadiusEnabled.BoolValue)
+        {
+            float ClientPosition[3];
+            float EntityPosition[3];
+            float distance;
+            LoopValidClients(i)
+            { 
+                GetEntPropVector(entity, Prop_Send, "m_vecOrigin", EntityPosition);
+                GetClientAbsOrigin(i, ClientPosition);
+                distance = GetVectorDistance(EntityPosition, ClientPosition);
+                if (distance <= g_cExplosionDeathRadius.FloatValue)
+                {
+                    ForcePlayerSuicide(i);
+                }
+            }
+        }
     }
 }
 
@@ -199,20 +236,55 @@ public Action Timer_TimeLeft(Handle timer, int client)
     g_iPlayer[client].time -= 1.0;
 }
 
+public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
+{
+    LoopValidClients(i)
+    {
+        if (g_iPlayer[i].HasChickenBomb)
+        {
+            SetEntPropEnt(g_iPlayer[i].ClientChickenBomb, Prop_Send, "m_leader", -1);
+        }
+    }
+}
+
+public Action Event_HegrenadeDetonate(Event event, const char[] name, bool dontBroadcast)
+{
+    LoopValidClients(i)
+    {
+        if (g_iPlayer[i].HasChickenBomb)
+        {
+            SetEntPropEnt(g_iPlayer[i].ClientChickenBomb, Prop_Send, "m_leader", -1);
+        }
+    }
+}
+
 public void OnEntityDestroyed(entity)
 {
     LoopValidClients(i)
     {
         if (entity == g_iPlayer[i].ClientChickenBomb)
         {
-            if (g_iPlayer[i].ChickenGotShot == true)
+            if (g_iPlayer[i].ChickenExploded == false)
             {
+                SetEntPropEnt(entity, Prop_Send, "m_leader", -1);
                 PrintToChatAll("The chicken got shot and created a small explosion!");
                 ClearTimers(i);
                 ClientReset(i);
             }
         }
     }
+}
+
+public void OnGameFrame()
+{
+    LoopValidClients(i)
+    {
+        if (g_iPlayer[i].HasChickenBomb == true)
+        {
+            int leader = ClosestClient(g_iPlayer[i].ClientChickenBomb);
+            SetEntPropEnt(g_iPlayer[i].ClientChickenBomb, Prop_Send, "m_leader", leader);
+        }
+    }   
 }
 
 Action Timer_NormalChicken(Handle timer, int entity)
@@ -233,7 +305,6 @@ void ClientReset(int client)
 {
     g_iPlayer[client].HasChickenBomb = false;
     g_iPlayer[client].ClientChickenBomb = 0;
-    g_iPlayer[client].time = g_cExplodeTime.FloatValue;
     g_iPlayer[client].HasChickenBomb = false;
 }
 
