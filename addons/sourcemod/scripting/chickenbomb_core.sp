@@ -4,8 +4,8 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <cstrike>
-#include <ttt>
 #include <emitsoundany>
+#include <ttt>
 
 #define SND_BOMB "training/firewerks_burst_02.wav"
 #define SND_BEEP "weapons/c4/c4_beep1.wav"
@@ -51,15 +51,15 @@ public Plugin myinfo =
 
 public OnPluginStart()
 {
-    g_cExplodeTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explode_time", "5.0", "The amount of time until the chicken bomb will explode.");
-    g_cNormalChickenTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_normal_time", "0.5", "The amount of time that the chicken will be its normal color.");
-    g_cRedChickenTime = AutoExecConfig_CreateConVar("ttt_chicken_bomb_red_time", "0.5", "The amount of time that the chicken will be the red color.");
-    g_cGrenadeDamage = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_damage", "500", "The damage of the grenade the chicken will drop after being shot.");
-    g_cGrenadeRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_grenade_radius", "500", "The radius of the grenade the chicken will drop after being shot.");
-    g_cExplosionRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_radius", "1000", "The radius of the chicken that will explode.");
-    g_cExplosionMagnitude = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_magnitude", "1000", "The magnitude of the chicken that will explode.");
-    g_cExplosionDeathRadius = AutoExecConfig_CreateConVar("ttt_chicken_bomb_explosion_death_radius", "500.0", "The radius of the certain death of a player, so if the player is in radius he will certainly die.");
-    g_cDeathRadiusEnabled = AutoExecConfig_CreateConVar("ttt_chicken_bomb_death_radius_enabled", "1", "Sets whether the death radius is enabled.");
+    g_cExplodeTime = CreateConVar("ttt_chicken_bomb_explode_time", "5.0", "The amount of time until the chicken bomb will explode.");
+    g_cNormalChickenTime = CreateConVar("ttt_chicken_bomb_normal_time", "0.5", "The amount of time that the chicken will be its normal color.");
+    g_cRedChickenTime = CreateConVar("ttt_chicken_bomb_red_time", "0.5", "The amount of time that the chicken will be the red color.");
+    g_cGrenadeDamage = CreateConVar("ttt_chicken_bomb_grenade_damage", "500", "The damage of the grenade the chicken will drop after being shot.");
+    g_cGrenadeRadius = CreateConVar("ttt_chicken_bomb_grenade_radius", "500", "The radius of the grenade the chicken will drop after being shot.");
+    g_cExplosionRadius = CreateConVar("ttt_chicken_bomb_explosion_radius", "1000", "The radius of the chicken that will explode.");
+    g_cExplosionMagnitude = CreateConVar("ttt_chicken_bomb_explosion_magnitude", "1000", "The magnitude of the chicken that will explode.");
+    g_cExplosionDeathRadius = CreateConVar("ttt_chicken_bomb_explosion_death_radius", "500.0", "The radius of the certain death of a player, so if the player is in radius he will certainly die.");
+    g_cDeathRadiusEnabled = CreateConVar("ttt_chicken_bomb_death_radius_enabled", "1", "Sets whether the death radius is enabled.");
 
     HookEvent("weapon_fire", Event_WeaponFire);
     HookEvent("hegrenade_detonate", Event_HegrenadeDetonate);
@@ -128,9 +128,6 @@ public void CreateChicken(int client)
 
             g_iPlayer[client].HasChickenBomb = true;
             g_iPlayer[client].ChickenExploded = false;
-
-            int leader = ClosestClient(entity);
-            SetEntPropEnt(entity, Prop_Send, "m_leader", leader);
 
             g_iPlayer[client].time = g_cExplodeTime.FloatValue;
             g_iPlayer[client].chickenexplode = CreateDataTimer(g_iPlayer[client].time, Timer_ChickenExplode, data);
@@ -258,7 +255,7 @@ public Action Event_HegrenadeDetonate(Event event, const char[] name, bool dontB
     }
 }
 
-public void OnEntityDestroyed(entity)
+public void OnEntityDestroyed(int entity)
 {
     LoopValidClients(i)
     {
@@ -285,6 +282,29 @@ public void OnGameFrame()
             SetEntPropEnt(g_iPlayer[i].ClientChickenBomb, Prop_Send, "m_leader", leader);
         }
     }   
+}
+
+int ClosestClient(int entity)
+{
+    int leader;
+    float LeaderDistance = 0.0;
+    float EntityPosition[3];
+    float ClientPosition[3];
+    float distance;
+            
+    LoopValidClients(i)
+    {
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", EntityPosition);
+        GetClientAbsOrigin(i, ClientPosition);
+        distance = GetVectorDistance(EntityPosition, ClientPosition);
+        if (distance > LeaderDistance)
+        {
+            LeaderDistance = distance;
+            leader = i;
+        }
+    }
+
+    return leader;
 }
 
 Action Timer_NormalChicken(Handle timer, int entity)
@@ -316,27 +336,14 @@ void ClearTimers(int client)
     ClearTimer(g_iPlayer[client].timeleft);
 }
 
-int ClosestClient(int entity)
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-    int leader;
-    float LeaderDistance = 0.0;
-    float EntityPosition[3];
-    float ClientPosition[3];
-    float distance;
-            
-    LoopValidClients(i)
-    {
-        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", EntityPosition);
-        GetClientAbsOrigin(i, ClientPosition);
-        distance = GetVectorDistance(EntityPosition, ClientPosition);
-        if (distance > LeaderDistance)
-        {
-            LeaderDistance = distance;
-            leader = i;
-        }
-    }
+    CreateNative("CreateChicken", Native_CreateChicken);
+    CreateNative("GetClientChicken", Native_GetClientChicken);
+    
+    RegPluginLibrary("chickenbomb_core");
 
-    return leader;
+    return APLRes_Success;
 }
 
 //A native so you can use this plugin in other plugin
@@ -349,4 +356,14 @@ public int Native_CreateChicken(Handle plugin, int numParams)
         return;
     }
     CreateChicken(client);
+}
+
+public int Native_GetClientChicken(Handle plugin, int numParams)
+{
+    int client = GetNativeCell(1);
+    if (g_iPlayer[client].HasChickenBomb == true)
+    {
+        return g_iPlayer[client].ClientChickenBomb;
+    }
+    return -1;
 }

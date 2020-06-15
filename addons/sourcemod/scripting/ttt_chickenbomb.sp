@@ -136,3 +136,36 @@ public void TTT_OnInventoryMenuItemSelect(int client, const char[] itemshort)
         CreateChicken(client);
     }
 }
+
+public void OnGameFrame()
+{
+    LoopValidClients(i)
+    {
+        int chicken = GetClientChicken(i);
+        if (chicken > -1)
+        {
+            int leader;
+            float LeaderDistance = 0.0;
+            float ChickenPosition[3];
+            float ClientPosition[3];
+            float distance;
+                    
+            LoopValidClients(x)
+            {
+                int role = TTT_GetClientRole(x);
+                if (role != TTT_TEAM_TRAITOR)
+                {
+                    GetEntPropVector(chicken, Prop_Send, "m_vecOrigin", ChickenPosition);
+                    GetClientAbsOrigin(x, ClientPosition);
+                    distance = GetVectorDistance(ChickenPosition, ClientPosition);
+                    if (distance > LeaderDistance)
+                    {
+                        LeaderDistance = distance;
+                        leader = x;
+                    }
+                }
+            }
+            SetEntPropEnt(chicken, Prop_Send, "m_leader", leader);
+        }
+    }
+}

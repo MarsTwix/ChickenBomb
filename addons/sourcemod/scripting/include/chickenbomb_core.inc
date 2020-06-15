@@ -5,6 +5,7 @@
 #define _chickenbomb_core_included
 
 native void CreateChicken(int client);
+native int GetClientChicken(int client);
 
 public SharedPlugin __pl_chickenbomb_core = 
 {
@@ -21,4 +22,6 @@ public SharedPlugin __pl_chickenbomb_core =
 public void __pl_chickenbomb_core_SetNTVOptional()
 {
     MarkNativeAsOptional("CreateChicken");
+    MarkNativeAsOptional("GetClientChicken");
 }
+#endif
