@@ -135,7 +135,7 @@ public void CreateChicken(int client)
             data.WriteCell(client);
 
             int numtime = RoundFloat(g_iPlayer[client].time);
-            PrintToChatAll("%i second(s) left!", numtime);
+            PrintHintText(client, "%i second(s) left!", numtime);
             g_iPlayer[client].time -= 1.0;
 
             EmitAmbientSoundAny("weapons/c4/c4_beep1.wav", NULL_VECTOR, entity);
@@ -149,7 +149,7 @@ public void CreateChicken(int client)
         }
         else{PrintToServer("Couldnt create entity \"chicken\".");}
     }
-    else{PrintToChat(client, "You already have a chickenbomb!");}
+    else{PrintHintText(client, "You already have a chickenbomb!");}
 }
 
 public Action Timer_ChickenExplode(Handle timer, DataPack data)
@@ -171,7 +171,7 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
     int shakeIndex = CreateEntityByName("env_shake");
     if (ExplosionIndex != -1 && particleIndex != -1 && shakeIndex != -1)
     {
-        PrintToChatAll("BOOM!");
+        PrintHintText(client, "BOOM!");
         
         char sShakeRadius[8];
         IntToString(5000, sShakeRadius, sizeof(sShakeRadius));
@@ -229,7 +229,7 @@ public Action Timer_ChickenExplode(Handle timer, DataPack data)
 public Action Timer_TimeLeft(Handle timer, int client)
 {
     int numtime = RoundFloat(g_iPlayer[client].time);
-    PrintToChatAll("%i second(s) left!", numtime);
+    PrintHintText(client, "%i second(s) left!", numtime);
     g_iPlayer[client].time -= 1.0;
 }
 
@@ -264,7 +264,10 @@ public void OnEntityDestroyed(int entity)
             if (g_iPlayer[i].ChickenExploded == false)
             {
                 SetEntPropEnt(entity, Prop_Send, "m_leader", -1);
-                PrintToChatAll("The chicken got shot and created a small explosion!");
+                if(g_iPlayer[i].ClientChickenBomb == entity)
+                {
+                    PrintHintText(i, "The chicken got shot and created a small explosion!");
+                }
                 ClearTimers(i);
                 ClientReset(i);
             }
