@@ -4,8 +4,10 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <cstrike>
+
 #include <emitsoundany>
 #include <ttt>
+#include <betterplacement>
 
 #define SND_BOMB "training/firewerks_burst_02.wav"
 #define SND_BEEP "weapons/c4/c4_beep1.wav"
@@ -93,7 +95,7 @@ Action Command_SpawnChicken(client, args)
 {
     CreateChicken(client);
 }
-
+/*
 public void CreateChicken(int client)
 {
     if (!g_iPlayer[client].HasChickenBomb)
@@ -150,6 +152,67 @@ public void CreateChicken(int client)
         else{PrintToServer("Couldnt create entity \"chicken\".");}
     }
     else{PrintHintText(client, "You already have a chickenbomb!");}
+}
+*/
+
+public void CreateChicken(int client)
+{
+    if (!g_iPlayer[client].HasChickenBomb)
+    {
+        BetterPlacement(client, "chicken", 2.0, 150);
+    }
+    else
+    {
+        PrintToChat(client, "You already have a chickenbomb!");
+    }
+}
+
+public void PreEntitySpawn(int entity, int client)
+{
+    if (g_iPlayer[client].HasChickenBomb)
+    {
+        char sGrenadeDamage[8];
+        char sGrenadeRadius[8];
+
+        IntToString(g_cGrenadeDamage.IntValue, sGrenadeDamage, sizeof(sGrenadeDamage));
+        IntToString(g_cGrenadeRadius.IntValue, sGrenadeRadius, sizeof(sGrenadeRadius));
+
+        int RandomNum = GetRandomInt(0, 5);
+        SetEntProp(entity, Prop_Send, "m_nBody", RandomNum);
+        DispatchKeyValue(entity, "targetname", "chickenbomb");
+        DispatchKeyValue(entity, "ExplodeDamage", sGrenadeDamage);
+        DispatchKeyValue(entity, "ExplodeRadius", sGrenadeRadius);
+
+        g_iPlayer[client].ClientChickenBomb = entity;
+        g_iPlayer[client].HasChickenBomb = true;
+        g_iPlayer[client].ChickenExploded = false;
+    }
+}
+
+public void EntitySpawn(int entity, int client, float EntityPosition[3])
+{
+    if (g_iPlayer[client].HasChickenBomb)
+    {
+        DataPack data;
+
+        g_iPlayer[client].time = g_cExplodeTime.FloatValue;  
+        g_iPlayer[client].chickenexplode = CreateDataTimer(g_iPlayer[client].time, Timer_ChickenExplode, data);
+
+        data.WriteCell(entity);
+        data.WriteCell(client);
+        int numtime = RoundFloat(g_iPlayer[client].time);
+        PrintHintText(client, "%i second(s) left!", numtime);
+        g_iPlayer[client].time -= 1.0;
+
+        EmitAmbientSoundAny("weapons/c4/c4_beep1.wav", NULL_VECTOR, entity);
+        DispatchKeyValue(entity, "rendercolor", "255, 0, 0");
+
+        g_iPlayer[client].normalchicken = CreateTimer(g_cNormalChickenTime.FloatValue, Timer_NormalChicken, entity, TIMER_REPEAT);
+
+        g_iPlayer[client].redchicken = CreateTimer(g_cNormalChickenTime.FloatValue + g_cRedChickenTime.FloatValue, Timer_RedChicken, entity, TIMER_REPEAT);
+
+        g_iPlayer[client].timeleft = CreateTimer(1.0, Timer_TimeLeft, client, TIMER_REPEAT);
+    }
 }
 
 public Action Timer_ChickenExplode(Handle timer, DataPack data)
