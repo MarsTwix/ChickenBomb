@@ -396,10 +396,10 @@ void ClientReset(int client)
 
 void ClearTimers(int client)
 {
-    ClearTimer(g_iPlayer[client].chickenexplode);
-    ClearTimer(g_iPlayer[client].normalchicken);
-    ClearTimer(g_iPlayer[client].redchicken);
-    ClearTimer(g_iPlayer[client].timeleft);
+    KillTimer(g_iPlayer[client].chickenexplode);
+    KillTimer(g_iPlayer[client].normalchicken);
+    KillTimer(g_iPlayer[client].redchicken);
+    KillTimer(g_iPlayer[client].timeleft);
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
