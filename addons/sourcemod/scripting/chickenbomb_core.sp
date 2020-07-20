@@ -91,7 +91,7 @@ public void OnClientPutInServer(int client)
     g_iPlayer[client].timeleft = INVALID_HANDLE;
 }
 
-Action Command_SpawnChicken(client, args)
+Action Command_SpawnChicken(int client, int args)
 {
     CreateChicken(client);
 }
@@ -159,7 +159,7 @@ public void CreateChicken(int client)
 {
     if (!g_iPlayer[client].HasChickenBomb)
     {
-        BetterPlacement(client, "chicken", 2.0, 150);
+        BetterPlacement(client, "chicken", 2.0, 150, "ChickenBomb");
     }
     else
     {
@@ -169,7 +169,7 @@ public void CreateChicken(int client)
 
 public void PreEntitySpawn(int entity, int client)
 {
-    if (g_iPlayer[client].HasChickenBomb)
+    if (HasTargetName(client, "ChickenBomb"))
     {
         char sGrenadeDamage[8];
         char sGrenadeRadius[8];
@@ -191,7 +191,7 @@ public void PreEntitySpawn(int entity, int client)
 
 public void EntitySpawn(int entity, int client, float EntityPosition[3])
 {
-    if (g_iPlayer[client].HasChickenBomb)
+    if (HasTargetName(client, "ChickenBomb"))
     {
         DataPack data;
 
