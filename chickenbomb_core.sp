@@ -363,7 +363,7 @@ int ClosestClient(int entity)
         GetEntPropVector(entity, Prop_Send, "m_vecOrigin", EntityPosition);
         GetClientAbsOrigin(i, ClientPosition);
         distance = GetVectorDistance(EntityPosition, ClientPosition);
-        if (distance > LeaderDistance)
+        if (distance < LeaderDistance)
         {
             LeaderDistance = distance;
             leader = i;
@@ -396,10 +396,10 @@ void ClientReset(int client)
 
 void ClearTimers(int client)
 {
-    KillTimer(g_iPlayer[client].chickenexplode);
-    KillTimer(g_iPlayer[client].normalchicken);
-    KillTimer(g_iPlayer[client].redchicken);
-    KillTimer(g_iPlayer[client].timeleft);
+    TTT_ClearTimer(g_iPlayer[client].chickenexplode);
+    TTT_ClearTimer(g_iPlayer[client].normalchicken);
+    TTT_ClearTimer(g_iPlayer[client].redchicken);
+    TTT_ClearTimer(g_iPlayer[client].timeleft);
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
